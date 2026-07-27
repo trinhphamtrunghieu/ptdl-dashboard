@@ -18,21 +18,21 @@ COL_NAMES_MAP = {
     "province": "Tỉnh",
     "year_std": "Năm",
     "migrant": "Có di cư (1=Có, 0=Không)",
-    "wmigr": "Di cư vì việc làm",
-    "other_migrant": "Di cư lý do khác",
-    "dremit": "Nhận kiều hối",
-    "dremit2": "Kiều hối 2",
-    "quintile": "Nhóm thu nhập",
-    "natshock_bin": "Cú sốc thiên tai",
-    "econshock_bin": "Cú sốc kinh tế",
-    "rhhincome": "Thu nhập thực",
+    "wmigr": "Di cư vì việc làm (1=Có, 0=Không)",
+    "other_migrant": "Di cư lý do khác (1=Có, 0=Không)",
+    "dremit": "Nhận kiều hối (1=Có, 0=Không)",
+    "dremit2": "Nhận kiều hối từ nguồn khác (1=Có, 0=Không)",
+    "quintile": "Phân vị thu nhập (Nhóm 1-5)",
+    "natshock_bin": "Cú sốc thiên tai (1=Có, 0=Không)",
+    "econshock_bin": "Cú sốc kinh tế (1=Có, 0=Không)",
+    "rhhincome": "Thu nhập thực (Nghìn VNĐ)",
     "age": "Tuổi chủ hộ",
-    "totareaown": "Diện tích đất",
-    "femalehead_bin": "Chủ hộ nữ",
-    "kinh": "Dân tộc Kinh",
-    "dfoodexp_pc": "Mức thay đổi chi tiêu thực phẩm/người", # Đã sửa cho rõ nghĩa
-    "damtbor": "Mức thay đổi số tiền đi vay", # Đã sửa cho rõ nghĩa
-    "income_asinh": "Thu nhập (arcsinh)"
+    "totareaown": "Diện tích đất (m2)",
+    "femalehead_bin": "Chủ hộ nữ (1=Có, 0=Không)",
+    "kinh": "Dân tộc Kinh (1=Có, 0=Không)",
+    "dfoodexp_pc": "Mức thay đổi chi tiêu thực phẩm/người (Nghìn VNĐ)",
+    "damtbor": "Mức thay đổi số tiền đi vay (Nghìn VNĐ)",
+    "income_asinh": "Thu nhập thực (arcsinh)"
 }
 
 # Hàm chuẩn hóa năm
@@ -116,18 +116,15 @@ if data_file_path is not None:
             col1, col2, col3 = st.columns([1, 1, 4])
             
             with col1:
-                # Dropdown chọn số item mỗi trang (Từ 50 -> 100, bước nhảy 10)
                 rows_per_page = st.selectbox(
                     "Số dòng mỗi trang:", 
                     options=list(range(50, 110, 10)), 
                     index=0
                 )
             
-            # Tính tổng số trang
             total_pages = (len(panel) - 1) // rows_per_page + 1 
             
             with col2:
-                # Dropdown chọn trang
                 page_num = st.selectbox(
                     "Chọn trang:", 
                     options=list(range(1, total_pages + 1)), 
@@ -168,11 +165,11 @@ if data_file_path is not None:
             fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
 
             sns.barplot(data=panel, x="migrant", y="dfoodexp_pc", ax=axes[0], palette="Blues")
-            axes[0].set_title("Mức thay đổi chi tiêu thực phẩm/người")
+            axes[0].set_title("Thay đổi chi tiêu thực phẩm/người\\n(Nghìn VNĐ)")
             axes[0].set_xlabel("0 = Không | 1 = Có di cư")
 
             sns.barplot(data=panel, x="migrant", y="damtbor", ax=axes[1], palette="Oranges")
-            axes[1].set_title("Mức thay đổi số tiền đi vay")
+            axes[1].set_title("Thay đổi số tiền đi vay\\n(Nghìn VNĐ)")
             axes[1].set_xlabel("0 = Không | 1 = Có di cư")
 
             mig_rate = panel.groupby("year_std")["migrant"].mean()
@@ -193,7 +190,7 @@ if data_file_path is not None:
                            "Tỉnh/vùng", "Cú sốc thiên tai", "Cú sốc kinh tế"]
             treatment = "Di cư lao động"
             mediator = "Nhận kiều hối"
-            outcomes_dag = ["Thay đổi chi tiêu thực phẩm", "Thay đổi vay mượn / An sinh", "Thu nhập hộ"]
+            outcomes_dag = ["Thay đổi chi tiêu thực phẩm\\n(Nghìn VNĐ)", "Thay đổi số tiền vay\\n(Nghìn VNĐ)", "Thu nhập hộ\\n(Nghìn VNĐ)"]
 
             for c in confounders:
                 G.add_edge(c, treatment)
@@ -214,11 +211,11 @@ if data_file_path is not None:
                 "Diện tích đất": (-2, 0), "Tỉnh/vùng": (-2, -1),
                 "Cú sốc thiên tai": (-2, -2), "Cú sốc kinh tế": (-2, -3),
                 "Di cư lao động": (0, 0), "Nhận kiều hối": (2, 0),
-                "Thay đổi chi tiêu thực phẩm": (4, 1.5), "Thay đổi vay mượn / An sinh": (4, 0), "Thu nhập hộ": (4, -1.5),
+                "Thay đổi chi tiêu thực phẩm\\n(Nghìn VNĐ)": (4, 1.5), "Thay đổi số tiền vay\\n(Nghìn VNĐ)": (4, 0), "Thu nhập hộ\\n(Nghìn VNĐ)": (4, -1.5),
             }
 
-            fig_dag, ax_dag = plt.subplots(figsize=(12, 7))
-            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2600, edgecolors="black", ax=ax_dag)
+            fig_dag, ax_dag = plt.subplots(figsize=(13, 8))
+            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2800, edgecolors="black", ax=ax_dag)
             nx.draw_networkx_labels(G, pos, font_size=9, ax=ax_dag)
             nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=18, connectionstyle="arc3,rad=0.05", ax=ax_dag)
             ax_dag.axis("off")
@@ -281,4 +278,4 @@ if data_file_path is not None:
         st.error(f"Đã xảy ra lỗi khi xử lý dữ liệu: {e}")
 
 else:
-    st.error("❌ Không tìm thấy file dữ liệu.")
+    st.error("❌ Không tìm thấy file dữ liệu.\n\nVui lòng đặt file `Chapter_7a.dta` hoặc `varhs_combined_data.csv` vào cùng thư mục với file app.py.")
