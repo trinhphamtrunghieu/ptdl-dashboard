@@ -136,7 +136,7 @@ if data_file_path is not None:
             
             col1, col2, col3 = st.columns([1, 1, 4])
             with col1:
-                rows_per_page = st.selectbox("Số dòng mỗi trang:", options=list(range(50, 110, 10)), index=0)
+                rows_per_page = st.selectbox("Số dòng:", options=list(range(50, 110, 10)), index=0)
             total_pages = (len(panel) - 1) // rows_per_page + 1 
             with col2:
                 page_num = st.selectbox("Chọn trang:", options=list(range(1, total_pages + 1)), index=0)
