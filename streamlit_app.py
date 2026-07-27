@@ -190,30 +190,37 @@ if data_file_path is not None:
             plt.tight_layout()
             st.pyplot(fig) 
 
-        # --- TAB 3: ĐỒ THỊ DAG (GRAPHVIZ) ---
+# --- TAB 3: ĐỒ THỊ DAG (GRAPHVIZ) ---
         with tab3:
             st.subheader("Đồ thị nhân quả (DAG)")
-            st.markdown("Biểu diễn giả định nhân quả. Các nút màu xanh dương là các biến gây nhiễu đang được kiểm soát.")
+            st.markdown("Biểu diễn giả định nhân quả. Cấu trúc DAG tự động cập nhật dựa trên các biến gây nhiễu được chọn ở thanh bên.")
             
-            # Tạo đồ thị bằng Graphviz
-            graph = graphviz.Digraph()
-            graph.attr(rankdir='LR', size='10,6') # Từ trái sang phải
-            with graph.subgraph(name='cluster_legend') as c:
-                c.attr(label='Legend', color='black', style='solid', rank='sink')
-                
-                # Define legend items as key-value pairs of nodes
-                c.node('key1', 'Biến gây nhiễu (cofounder)', fillcolor='#a6cee3', style='filled')
-                c.node('key2', 'Biến can thiệp (treatment)', fillcolor='#fb9a99', style='filled')
-                c.node('key3', 'Biến trung gian (mediator)', fillcolor='#fdbf6f', style='filled')
-                c.node('key4', 'Biến kết quả (outcome)', fillcolor='#b2df8a', style='filled')
-            graph.render('graph_with_legend', format='png', cleanup=True)
-            # Bảng màu
+            # Bảng màu (Đưa lên trên để dùng chung cho Legend)
             color_treatment = "#fb9a99"
             color_mediator = "#fdbf6f"
             color_outcome = "#b2df8a"
             color_confounder = "#a6cee3"
 
-            # 1. Các Node cốt lõi
+            # Tạo đồ thị bằng Graphviz
+            graph = graphviz.Digraph()
+            graph.attr(rankdir='LR', size='10,6') # Từ trái sang phải
+            
+            # --- TẠO LEGEND (CHÚ GIẢI) ---
+            with graph.subgraph(name='cluster_legend') as c:
+                c.attr(label='Chú giải', color='black', style='solid')
+                
+                # Định nghĩa các node trong Legend (Khớp shape với đồ thị thật)
+                c.node('key1', 'Biến gây nhiễu (confounder)', fillcolor=color_confounder, style='filled', shape='ellipse')
+                c.node('key2', 'Biến can thiệp (treatment)', fillcolor=color_treatment, style='filled', shape='box')
+                c.node('key3', 'Biến trung gian (mediator)', fillcolor=color_mediator, style='filled', shape='box')
+                c.node('key4', 'Biến kết quả (outcome)', fillcolor=color_outcome, style='filled', shape='ellipse')
+                
+                # Dùng các đường nối tàng hình để ép Legend xếp dọc đẹp mắt
+                c.edge('key1', 'key2', style='invis')
+                c.edge('key2', 'key3', style='invis')
+                c.edge('key3', 'key4', style='invis')
+
+            # --- 1. CÁC NODE CỐT LÕI ---
             graph.node("Di cư lao động", style="filled", fillcolor=color_treatment, shape="box")
             graph.node("Nhận kiều hối", style="filled", fillcolor=color_mediator, shape="box")
             
@@ -221,13 +228,13 @@ if data_file_path is not None:
             for o in outcomes_dag:
                 graph.node(o, style="filled", fillcolor=color_outcome, shape="ellipse")
                 
-            # 2. Định nghĩa các cung kết nối nhân quả chính
+            # --- 2. ĐỊNH NGHĨA CÁC CUNG KẾT NỐI NHÂN QUẢ CHÍNH ---
             graph.edge("Di cư lao động", "Nhận kiều hối")
             for o in outcomes_dag:
                 graph.edge("Di cư lao động", o)
                 graph.edge("Nhận kiều hối", o)
                 
-            # 3. Kết nối Biến gây nhiễu (Dựa trên Sidebar MultiSelect)
+            # --- 3. KẾT NỐI BIẾN GÂY NHIỄU ---
             if len(selected_confounders_ui) > 0:
                 for c in selected_confounders_ui:
                     graph.node(c, style="filled", fillcolor=color_confounder, shape="ellipse")
@@ -237,6 +244,7 @@ if data_file_path is not None:
             else:
                 st.warning("⚠️ Không có biến gây nhiễu nào được chọn.")
 
+            # Vẽ trực tiếp lên giao diện Streamlit (Không cần gọi .render lưu file)
             st.graphviz_chart(graph)
 
         # --- TAB 4: MÔ HÌNH 1 (IPTW / PSM) ---
