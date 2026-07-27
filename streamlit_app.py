@@ -190,35 +190,31 @@ if data_file_path is not None:
             plt.tight_layout()
             st.pyplot(fig) 
 
-# --- TAB 3: ĐỒ THỊ DAG (GRAPHVIZ) ---
+        # --- TAB 3: ĐỒ THỊ DAG (GRAPHVIZ) ---
         with tab3:
             st.subheader("Đồ thị nhân quả (DAG)")
             st.markdown("Biểu diễn giả định nhân quả. Cấu trúc DAG tự động cập nhật dựa trên các biến gây nhiễu được chọn ở thanh bên.")
             
-            # Bảng màu (Đưa lên trên để dùng chung cho Legend)
             color_treatment = "#fb9a99"
             color_mediator = "#fdbf6f"
             color_outcome = "#b2df8a"
             color_confounder = "#a6cee3"
 
-            # Tạo đồ thị bằng Graphviz
             graph = graphviz.Digraph()
-            graph.attr(rankdir='LR', size='10,6') # Từ trái sang phải
+            graph.attr(rankdir='LR', size='10,6') 
             
-            # --- TẠO LEGEND (CHÚ GIẢI) ---
-            with graph.subgraph(name='cluster_legend') as c:
-                c.attr(label='Chú giải', color='black', style='solid')
-                
-                # Định nghĩa các node trong Legend (Khớp shape với đồ thị thật)
-                c.node('key1', 'Biến gây nhiễu (confounder)', fillcolor=color_confounder, style='filled', shape='ellipse')
-                c.node('key2', 'Biến can thiệp (treatment)', fillcolor=color_treatment, style='filled', shape='box')
-                c.node('key3', 'Biến trung gian (mediator)', fillcolor=color_mediator, style='filled', shape='box')
-                c.node('key4', 'Biến kết quả (outcome)', fillcolor=color_outcome, style='filled', shape='ellipse')
-                
-                # Dùng các đường nối tàng hình để ép Legend xếp dọc đẹp mắt
-                c.edge('key1', 'key2', style='invis')
-                c.edge('key2', 'key3', style='invis')
-                c.edge('key3', 'key4', style='invis')
+            # --- LEGEND TỐI ƯU BẰNG HTML TABLE ---
+            legend_html = f'''<
+            <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
+              <TR><TD BORDER="0"><B>Chú giải</B></TD></TR>
+              <TR><TD BGCOLOR="{color_confounder}">Biến gây nhiễu (Confounder)</TD></TR>
+              <TR><TD BGCOLOR="{color_treatment}">Biến can thiệp (Treatment)</TD></TR>
+              <TR><TD BGCOLOR="{color_mediator}">Biến trung gian (Mediator)</TD></TR>
+              <TR><TD BGCOLOR="{color_outcome}">Biến kết quả (Outcome)</TD></TR>
+            </TABLE>
+            >'''
+            # Tạo một node duy nhất đóng vai trò làm Legend
+            graph.node("legend", label=legend_html, shape="plaintext")
 
             # --- 1. CÁC NODE CỐT LÕI ---
             graph.node("Di cư lao động", style="filled", fillcolor=color_treatment, shape="box")
@@ -228,7 +224,7 @@ if data_file_path is not None:
             for o in outcomes_dag:
                 graph.node(o, style="filled", fillcolor=color_outcome, shape="ellipse")
                 
-            # --- 2. ĐỊNH NGHĨA CÁC CUNG KẾT NỐI NHÂN QUẢ CHÍNH ---
+            # --- 2. KẾT NỐI NHÂN QUẢ CHÍNH ---
             graph.edge("Di cư lao động", "Nhận kiều hối")
             for o in outcomes_dag:
                 graph.edge("Di cư lao động", o)
@@ -244,7 +240,6 @@ if data_file_path is not None:
             else:
                 st.warning("⚠️ Không có biến gây nhiễu nào được chọn.")
 
-            # Vẽ trực tiếp lên giao diện Streamlit (Không cần gọi .render lưu file)
             st.graphviz_chart(graph)
 
         # --- TAB 4: MÔ HÌNH 1 (IPTW / PSM) ---
