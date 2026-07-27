@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import networkx as nx
+import graphviz
 import os
 import glob
 import statsmodels.api as sm
@@ -12,7 +12,7 @@ from linearmodels import PanelOLS
 # Cấu hình trang Streamlit
 st.set_page_config(page_title="Phân tích Di cư Lao động", layout="wide")
 
-# --- ĐỊNH NGHĨA TÊN CỘT TIẾNG VIỆT CHO GIAO DIỆN (UI) ---
+# --- ĐỊNH NGHĨA TÊN CỘT TIẾNG VIỆT & MAPPING CHO BIẾN GÂY NHIỄU ---
 COL_NAMES_MAP = {
     "hhid": "Mã hộ",
     "province": "Tỉnh",
@@ -33,6 +33,15 @@ COL_NAMES_MAP = {
     "dfoodexp_pc": "Mức thay đổi chi tiêu thực phẩm/người (Nghìn VNĐ)",
     "damtbor": "Mức thay đổi số tiền đi vay (Nghìn VNĐ)",
     "income_asinh": "Thu nhập thực (arcsinh)"
+}
+
+CONFOUNDER_MAP = {
+    "Tuổi chủ hộ": "age",
+    "Diện tích đất (m2)": "totareaown",
+    "Chủ hộ nữ": "femalehead_bin",
+    "Dân tộc Kinh": "kinh",
+    "Cú sốc thiên tai": "natshock_bin",
+    "Cú sốc kinh tế": "econshock_bin"
 }
 
 # Hàm chuẩn hóa năm
@@ -98,6 +107,19 @@ if data_file_path is not None:
     try:
         panel = load_and_clean_data(data_file_path)
         
+        # --- SIDEBAR TƯƠNG TÁC BIẾN GÂY NHIỄU ---
+        st.sidebar.header("Cấu hình Mô hình")
+        st.sidebar.markdown("Chọn các **biến gây nhiễu (Confounders)** đưa vào phân tích:")
+        
+        selected_confounders_ui = st.sidebar.multiselect(
+            "Biến quan sát được:",
+            options=list(CONFOUNDER_MAP.keys()),
+            default=list(CONFOUNDER_MAP.keys()) # Mặc định chọn tất cả
+        )
+        
+        # Ánh xạ từ tên tiếng Việt sang tên cột trong dataframe
+        selected_covars = [CONFOUNDER_MAP[c] for c in selected_confounders_ui]
+        
         # 5 Tab chính
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "📊 Dữ liệu Panel", 
@@ -112,31 +134,17 @@ if data_file_path is not None:
             st.subheader("Bộ dữ liệu phân tích (Panel hộ gia đình 2012–2014)")
             st.markdown(f"**Tổng số dòng:** {panel.shape[0]} | **Số cột:** {panel.shape[1]}")
             
-            # Phân chia cột cho các Dropdown
             col1, col2, col3 = st.columns([1, 1, 4])
-            
             with col1:
-                rows_per_page = st.selectbox(
-                    "Số dòng mỗi trang:", 
-                    options=list(range(50, 110, 10)), 
-                    index=0
-                )
-            
+                rows_per_page = st.selectbox("Số dòng mỗi trang:", options=list(range(50, 110, 10)), index=0)
             total_pages = (len(panel) - 1) // rows_per_page + 1 
-            
             with col2:
-                page_num = st.selectbox(
-                    "Chọn trang:", 
-                    options=list(range(1, total_pages + 1)), 
-                    index=0
-                )
+                page_num = st.selectbox("Chọn trang:", options=list(range(1, total_pages + 1)), index=0)
             
-            # Cắt dữ liệu (slice) theo phân trang
             start_idx = (page_num - 1) * rows_per_page
             end_idx = start_idx + rows_per_page
             paginated_df = panel.iloc[start_idx:end_idx]
             
-            # Hiển thị bảng
             st.dataframe(paginated_df.rename(columns=COL_NAMES_MAP), use_container_width=True)
             st.caption(f"Đang hiển thị từ dòng **{start_idx + 1}** đến **{min(end_idx, len(panel))}** trên tổng số **{len(panel)}** dòng.")
             
@@ -150,10 +158,11 @@ if data_file_path is not None:
             st.subheader("Kiểm tra cân bằng (Balance check)")
             st.markdown("Nhóm hộ **có di cư** và **không di cư** có sự khác biệt hệ thống về các đặc điểm nền (Bias).")
             
-            covariates = ["age", "totareaown", "femalehead_bin", "kinh", "natshock_bin", "econshock_bin"]
+            # Cập nhật danh sách hiển thị dựa trên biến đã chọn (mặc định lấy theo list đầy đủ nếu không bị bỏ check)
+            covars_to_show = selected_covars if selected_covars else list(CONFOUNDER_MAP.values())
             outcomes = ["dfoodexp_pc", "damtbor", "income_asinh"]
             
-            balance = panel.groupby("migrant")[covariates + outcomes].mean().T
+            balance = panel.groupby("migrant")[covars_to_show + outcomes].mean().T
             balance.columns = ["Không di cư", "Có di cư"]
             balance["Chênh lệch"] = balance["Có di cư"] - balance["Không di cư"]
             
@@ -165,11 +174,11 @@ if data_file_path is not None:
             fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
 
             sns.barplot(data=panel, x="migrant", y="dfoodexp_pc", ax=axes[0], palette="Blues")
-            axes[0].set_title("Thay đổi chi tiêu thực phẩm/người\\n(Nghìn VNĐ)")
+            axes[0].set_title("Mức thay đổi chi tiêu thực phẩm/người")
             axes[0].set_xlabel("0 = Không | 1 = Có di cư")
 
             sns.barplot(data=panel, x="migrant", y="damtbor", ax=axes[1], palette="Oranges")
-            axes[1].set_title("Thay đổi số tiền đi vay\\n(Nghìn VNĐ)")
+            axes[1].set_title("Mức thay đổi số tiền đi vay")
             axes[1].set_xlabel("0 = Không | 1 = Có di cư")
 
             mig_rate = panel.groupby("year_std")["migrant"].mean()
@@ -181,70 +190,72 @@ if data_file_path is not None:
             plt.tight_layout()
             st.pyplot(fig) 
 
-        # --- TAB 3: ĐỒ THỊ DAG ---
+        # --- TAB 3: ĐỒ THỊ DAG (GRAPHVIZ) ---
         with tab3:
             st.subheader("Đồ thị nhân quả (DAG)")
+            st.markdown("Biểu diễn giả định nhân quả. Các nút màu xanh dương là các biến gây nhiễu đang được kiểm soát.")
             
-            G = nx.DiGraph()
-            confounders = ["Tuổi chủ hộ", "Giới tính chủ hộ", "Dân tộc", "Diện tích đất",
-                           "Tỉnh/vùng", "Cú sốc thiên tai", "Cú sốc kinh tế"]
-            treatment = "Di cư lao động"
-            mediator = "Nhận kiều hối"
-            outcomes_dag = ["Thay đổi chi tiêu thực phẩm\\n(Nghìn VNĐ)", "Thay đổi số tiền vay\\n(Nghìn VNĐ)", "Thu nhập hộ\\n(Nghìn VNĐ)"]
+            # Tạo đồ thị bằng Graphviz
+            graph = graphviz.Digraph()
+            graph.attr(rankdir='LR', size='10,6') # Từ trái sang phải
+            
+            # Bảng màu
+            color_treatment = "#fb9a99"
+            color_mediator = "#fdbf6f"
+            color_outcome = "#b2df8a"
+            color_confounder = "#a6cee3"
 
-            for c in confounders:
-                G.add_edge(c, treatment)
-                for o in outcomes_dag:
-                    G.add_edge(c, o)
-
-            G.add_edge(treatment, mediator)
+            # 1. Các Node cốt lõi
+            graph.node("Di cư lao động", style="filled", fillcolor=color_treatment, shape="box")
+            graph.node("Nhận kiều hối", style="filled", fillcolor=color_mediator, shape="box")
+            
+            outcomes_dag = ["Thay đổi chi tiêu thực phẩm", "Thay đổi vay mượn", "Thu nhập hộ"]
             for o in outcomes_dag:
-                G.add_edge(treatment, o)
-                G.add_edge(mediator, o)
+                graph.node(o, style="filled", fillcolor=color_outcome, shape="ellipse")
+                
+            # 2. Định nghĩa các cung kết nối nhân quả chính
+            graph.edge("Di cư lao động", "Nhận kiều hối")
+            for o in outcomes_dag:
+                graph.edge("Di cư lao động", o)
+                graph.edge("Nhận kiều hối", o)
+                
+            # 3. Kết nối Biến gây nhiễu (Dựa trên Sidebar MultiSelect)
+            if len(selected_confounders_ui) > 0:
+                for c in selected_confounders_ui:
+                    graph.node(c, style="filled", fillcolor=color_confounder, shape="ellipse")
+                    graph.edge(c, "Di cư lao động")
+                    for o in outcomes_dag:
+                        graph.edge(c, o)
+            else:
+                st.warning("⚠️ Không có biến gây nhiễu nào được chọn.")
 
-            node_roles = {**{c: "confounder" for c in confounders}, treatment: "treatment", mediator: "mediator", **{o: "outcome" for o in outcomes_dag}}
-            color_map = {"confounder": "#a6cee3", "treatment": "#fb9a99", "mediator": "#fdbf6f", "outcome": "#b2df8a"}
-            node_colors = [color_map[node_roles[n]] for n in G.nodes()]
+            st.graphviz_chart(graph)
 
-            pos = {
-                "Tuổi chủ hộ": (-2, 3), "Giới tính chủ hộ": (-2, 2), "Dân tộc": (-2, 1),
-                "Diện tích đất": (-2, 0), "Tỉnh/vùng": (-2, -1),
-                "Cú sốc thiên tai": (-2, -2), "Cú sốc kinh tế": (-2, -3),
-                "Di cư lao động": (0, 0), "Nhận kiều hối": (2, 0),
-                "Thay đổi chi tiêu thực phẩm\\n(Nghìn VNĐ)": (4, 1.5), "Thay đổi số tiền vay\\n(Nghìn VNĐ)": (4, 0), "Thu nhập hộ\\n(Nghìn VNĐ)": (4, -1.5),
-            }
-
-            fig_dag, ax_dag = plt.subplots(figsize=(13, 8))
-            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2800, edgecolors="black", ax=ax_dag)
-            nx.draw_networkx_labels(G, pos, font_size=9, ax=ax_dag)
-            nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=18, connectionstyle="arc3,rad=0.05", ax=ax_dag)
-            ax_dag.axis("off")
-            st.pyplot(fig_dag)
-
-# --- TAB 4: MÔ HÌNH 1 (IPTW / PSM) ---
+        # --- TAB 4: MÔ HÌNH 1 (IPTW / PSM) ---
         with tab4:
             st.subheader("Mô hình 1: Inverse Probability of Treatment Weighting (IPTW)")
-            st.markdown("Kiểm soát thiên lệch chọn mẫu dựa trên các đặc điểm quan sát được (Selection on Observables).")
+            st.markdown("Kiểm soát thiên lệch chọn mẫu dựa trên các đặc điểm quan sát được.")
             
-            covars_iptw = ["age", "totareaown", "femalehead_bin", "kinh", "natshock_bin", "econshock_bin"]
-            X = sm.add_constant(panel[covars_iptw])
-            ps_model = sm.Logit(panel["migrant"], X).fit(disp=0)
-            ps = ps_model.predict(X)
-            
-            weights = np.where(panel["migrant"] == 1, 1/ps, 1/(1-ps))
-            
-            st.info(f"Đã tính toán thành công Trọng số (Weights). Min weight: {weights.min():.2f}, Max weight: {weights.max():.2f}")
+            if len(selected_covars) > 0:
+                # Nếu có chọn biến gây nhiễu -> Tính Propensity Score
+                X = sm.add_constant(panel[selected_covars])
+                ps_model = sm.Logit(panel["migrant"], X).fit(disp=0)
+                ps = ps_model.predict(X)
+                weights = np.where(panel["migrant"] == 1, 1/ps, 1/(1-ps))
+                st.info(f"✅ Đã tính toán thành công Trọng số dựa trên **{len(selected_covars)}** biến gây nhiễu. Min weight: {weights.min():.2f}, Max weight: {weights.max():.2f}")
+            else:
+                # Nếu không chọn biến gây nhiễu nào -> So sánh trung bình thô (Naive estimate)
+                weights = np.ones(len(panel))
+                st.warning("⚠️ Đang phân tích tác động thô (Mặc định Trọng số = 1) do không có biến gây nhiễu nào được kiểm soát.")
             
             results_iptw = []
             for outcome in outcomes:
-                # LỌC BỎ CÁC GIÁ TRỊ NaN Ở BIẾN KẾT QUẢ ĐỂ TRÁNH LỖI "None"
                 valid_idx = panel[outcome].notna()
                 
                 y_valid = panel.loc[valid_idx, outcome]
                 X_valid = sm.add_constant(panel.loc[valid_idx, "migrant"])
                 w_valid = weights[valid_idx]
                 
-                # Chạy mô hình với tập dữ liệu đã lọc
                 wls_model = sm.WLS(y_valid, X_valid, weights=w_valid).fit()
                 
                 results_iptw.append({
@@ -260,19 +271,21 @@ if data_file_path is not None:
         # --- TAB 5: MÔ HÌNH 2 (PANEL FIXED-EFFECTS) ---
         with tab5:
             st.subheader("Mô hình 2: Panel Fixed-Effects (FE)")
-            st.markdown("Sử dụng kỹ thuật Fixed-Effects theo Hộ gia đình để loại bỏ các biến gây nhiễu không đổi theo thời gian (Unobserved Time-Invariant Heterogeneity).")
+            st.markdown("Khai thác dữ liệu bảng để loại bỏ biến gây nhiễu không đổi theo thời gian.")
             
             panel_fe = panel.set_index(["hhid", "year_std"])
-            covars_fe = ["migrant", "natshock_bin", "econshock_bin"]
+            
+            # Cập nhật danh sách biến đưa vào FE dựa trên thanh điều khiển
+            covars_fe = ["migrant"] + selected_covars
             
             results_fe = []
             for outcome in outcomes:
-                # LỌC BỎ CÁC GIÁ TRỊ NaN TƯƠNG TỰ NHƯ MÔ HÌNH 1
                 valid_idx = panel_fe[outcome].notna()
                 
                 y_valid = panel_fe.loc[valid_idx, outcome]
                 exog_valid = sm.add_constant(panel_fe.loc[valid_idx, covars_fe])
                 
+                # drop_absorbed=True sẽ tự động lược bỏ các biến không đổi theo thời gian (giới tính, tuổi, dân tộc...)
                 fe_model = PanelOLS(y_valid, exog_valid, entity_effects=True, drop_absorbed=True).fit()
                 
                 results_fe.append({
@@ -284,8 +297,7 @@ if data_file_path is not None:
                 })
                 
             st.dataframe(pd.DataFrame(results_fe).style.format({"Hiệu ứng (Hệ số)": "{:.3f}", "Sai số chuẩn (Std.Err)": "{:.3f}", "p-value": "{:.4f}"}))
-            st.success("Cả 2 mô hình đã đưa ra các kết quả ước lượng giúp so sánh và phân tích nhân quả tốt hơn.")
-
+            
     except Exception as e:
         st.error(f"Đã xảy ra lỗi khi xử lý dữ liệu: {e}")
 
