@@ -206,11 +206,11 @@ if data_file_path is not None:
             # --- LEGEND TỐI ƯU BẰNG HTML TABLE ---
             legend_html = f'''<
             <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
-              <TR><TD BORDER="0"><B>Chú giải</B></TD></TR>
-              <TR><TD BGCOLOR="{color_confounder}">Biến gây nhiễu (Confounder)</TD></TR>
-              <TR><TD BGCOLOR="{color_treatment}">Biến can thiệp (Treatment)</TD></TR>
-              <TR><TD BGCOLOR="{color_mediator}">Biến trung gian (Mediator)</TD></TR>
-              <TR><TD BGCOLOR="{color_outcome}">Biến kết quả (Outcome)</TD></TR>
+              <TR><TD BORDER="0" ALIGN="CENTER"><B>Chú giải</B></TD></TR>
+              <TR><TD BGCOLOR="{color_confounder}" ALIGN="LEFT">Biến gây nhiễu (Confounder)</TD></TR>
+              <TR><TD BGCOLOR="{color_treatment}" ALIGN="LEFT">Biến can thiệp (Treatment)</TD></TR>
+              <TR><TD BGCOLOR="{color_mediator}" ALIGN="LEFT">Biến trung gian (Mediator)</TD></TR>
+              <TR><TD BGCOLOR="{color_outcome}" ALIGN="LEFT">Biến kết quả (Outcome)</TD></TR>
             </TABLE>
             >'''
             # Tạo một node duy nhất đóng vai trò làm Legend
