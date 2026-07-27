@@ -30,8 +30,8 @@ COL_NAMES_MAP = {
     "totareaown": "Diện tích đất",
     "femalehead_bin": "Chủ hộ nữ",
     "kinh": "Dân tộc Kinh",
-    "dfoodexp_pc": "Chi tiêu thực phẩm/người",
-    "damtbor": "Số tiền đi vay",
+    "dfoodexp_pc": "Mức thay đổi chi tiêu thực phẩm/người", # Đã sửa cho rõ nghĩa
+    "damtbor": "Mức thay đổi số tiền đi vay", # Đã sửa cho rõ nghĩa
     "income_asinh": "Thu nhập (arcsinh)"
 }
 
@@ -107,29 +107,40 @@ if data_file_path is not None:
             "⏳ Mô hình 2: Panel Fixed-Effects"
         ])
         
-# --- TAB 1: HIỂN THỊ DỮ LIỆU ---
+        # --- TAB 1: HIỂN THỊ DỮ LIỆU CÓ PHÂN TRANG ---
         with tab1:
             st.subheader("Bộ dữ liệu phân tích (Panel hộ gia đình 2012–2014)")
             st.markdown(f"**Tổng số dòng:** {panel.shape[0]} | **Số cột:** {panel.shape[1]}")
             
-            # --- TÍNH NĂNG PHÂN TRANG (PAGINATION) ---
-            rows_per_page = 50 # Số dòng hiển thị trên mỗi trang
-            total_pages = (len(panel) - 1) // rows_per_page + 1 # Tính tổng số trang
+            # Phân chia cột cho các Dropdown
+            col1, col2, col3 = st.columns([1, 1, 4])
             
-            # Khung chọn trang
-            col1, col2 = st.columns([1, 4])
             with col1:
-                page_num = st.number_input("Chọn trang:", min_value=1, max_value=total_pages, value=1, step=1)
+                # Dropdown chọn số item mỗi trang (Từ 50 -> 100, bước nhảy 10)
+                rows_per_page = st.selectbox(
+                    "Số dòng mỗi trang:", 
+                    options=list(range(50, 110, 10)), 
+                    index=0
+                )
             
-            # Xác định vị trí cắt dữ liệu (slice)
+            # Tính tổng số trang
+            total_pages = (len(panel) - 1) // rows_per_page + 1 
+            
+            with col2:
+                # Dropdown chọn trang
+                page_num = st.selectbox(
+                    "Chọn trang:", 
+                    options=list(range(1, total_pages + 1)), 
+                    index=0
+                )
+            
+            # Cắt dữ liệu (slice) theo phân trang
             start_idx = (page_num - 1) * rows_per_page
             end_idx = start_idx + rows_per_page
             paginated_df = panel.iloc[start_idx:end_idx]
             
-            # Hiển thị dữ liệu (Chỉ đổi tên cột cho phần hiển thị)
+            # Hiển thị bảng
             st.dataframe(paginated_df.rename(columns=COL_NAMES_MAP), use_container_width=True)
-            
-            # Dòng chú thích bên dưới bảng
             st.caption(f"Đang hiển thị từ dòng **{start_idx + 1}** đến **{min(end_idx, len(panel))}** trên tổng số **{len(panel)}** dòng.")
             
             st.markdown("---")
@@ -149,7 +160,6 @@ if data_file_path is not None:
             balance.columns = ["Không di cư", "Có di cư"]
             balance["Chênh lệch"] = balance["Có di cư"] - balance["Không di cư"]
             
-            # Đổi tên index sang tiếng Việt trên UI
             balance.index = [COL_NAMES_MAP.get(idx, idx) for idx in balance.index]
             st.dataframe(balance.round(3))
             
@@ -158,11 +168,11 @@ if data_file_path is not None:
             fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
 
             sns.barplot(data=panel, x="migrant", y="dfoodexp_pc", ax=axes[0], palette="Blues")
-            axes[0].set_title("Thay đổi chi tiêu thực phẩm/người")
+            axes[0].set_title("Mức thay đổi chi tiêu thực phẩm/người")
             axes[0].set_xlabel("0 = Không | 1 = Có di cư")
 
             sns.barplot(data=panel, x="migrant", y="damtbor", ax=axes[1], palette="Oranges")
-            axes[1].set_title("Thay đổi số tiền vay mượn")
+            axes[1].set_title("Mức thay đổi số tiền đi vay")
             axes[1].set_xlabel("0 = Không | 1 = Có di cư")
 
             mig_rate = panel.groupby("year_std")["migrant"].mean()
@@ -183,7 +193,7 @@ if data_file_path is not None:
                            "Tỉnh/vùng", "Cú sốc thiên tai", "Cú sốc kinh tế"]
             treatment = "Di cư lao động"
             mediator = "Nhận kiều hối"
-            outcomes_dag = ["Chi tiêu thực phẩm", "Vay mượn / An sinh", "Thu nhập hộ"]
+            outcomes_dag = ["Thay đổi chi tiêu thực phẩm", "Thay đổi vay mượn / An sinh", "Thu nhập hộ"]
 
             for c in confounders:
                 G.add_edge(c, treatment)
@@ -204,7 +214,7 @@ if data_file_path is not None:
                 "Diện tích đất": (-2, 0), "Tỉnh/vùng": (-2, -1),
                 "Cú sốc thiên tai": (-2, -2), "Cú sốc kinh tế": (-2, -3),
                 "Di cư lao động": (0, 0), "Nhận kiều hối": (2, 0),
-                "Chi tiêu thực phẩm": (4, 1.5), "Vay mượn / An sinh": (4, 0), "Thu nhập hộ": (4, -1.5),
+                "Thay đổi chi tiêu thực phẩm": (4, 1.5), "Thay đổi vay mượn / An sinh": (4, 0), "Thu nhập hộ": (4, -1.5),
             }
 
             fig_dag, ax_dag = plt.subplots(figsize=(12, 7))
@@ -219,13 +229,11 @@ if data_file_path is not None:
             st.subheader("Mô hình 1: Inverse Probability of Treatment Weighting (IPTW)")
             st.markdown("Kiểm soát thiên lệch chọn mẫu dựa trên các đặc điểm quan sát được (Selection on Observables).")
             
-            # Tính Propensity Score
             covars_iptw = ["age", "totareaown", "femalehead_bin", "kinh", "natshock_bin", "econshock_bin"]
             X = sm.add_constant(panel[covars_iptw])
             ps_model = sm.Logit(panel["migrant"], X).fit(disp=0)
             ps = ps_model.predict(X)
             
-            # Tính Weights
             weights = np.where(panel["migrant"] == 1, 1/ps, 1/(1-ps))
             
             st.info(f"Đã tính toán thành công Trọng số (Weights). Min weight: {weights.min():.2f}, Max weight: {weights.max():.2f}")
@@ -250,16 +258,12 @@ if data_file_path is not None:
             st.subheader("Mô hình 2: Panel Fixed-Effects (FE)")
             st.markdown("Sử dụng kỹ thuật Fixed-Effects theo Hộ gia đình để loại bỏ các biến gây nhiễu không đổi theo thời gian (Unobserved Time-Invariant Heterogeneity).")
             
-            # Setup Panel Data
             panel_fe = panel.set_index(["hhid", "year_std"])
-            
-            # Chỉ kiểm soát các biến thay đổi theo thời gian trong mô hình FE
             covars_fe = ["migrant", "natshock_bin", "econshock_bin"]
             
             results_fe = []
             for outcome in outcomes:
                 exog = sm.add_constant(panel_fe[covars_fe])
-                # Drop những cột bị hấp thụ (absorbed) bởi Fixed Effects
                 fe_model = PanelOLS(panel_fe[outcome], exog, entity_effects=True, drop_absorbed=True).fit()
                 
                 results_fe.append({
