@@ -107,13 +107,32 @@ if data_file_path is not None:
             "⏳ Mô hình 2: Panel Fixed-Effects"
         ])
         
-        # --- TAB 1: HIỂN THỊ DỮ LIỆU ---
+# --- TAB 1: HIỂN THỊ DỮ LIỆU ---
         with tab1:
             st.subheader("Bộ dữ liệu phân tích (Panel hộ gia đình 2012–2014)")
-            st.markdown(f"**Số dòng:** {panel.shape[0]} | **Số cột:** {panel.shape[1]}")
-            # CHỈ ĐỔI TÊN CỘT TRÊN UI THÔNG QUA RENAME
-            st.dataframe(panel.head(50).rename(columns=COL_NAMES_MAP)) 
+            st.markdown(f"**Tổng số dòng:** {panel.shape[0]} | **Số cột:** {panel.shape[1]}")
             
+            # --- TÍNH NĂNG PHÂN TRANG (PAGINATION) ---
+            rows_per_page = 50 # Số dòng hiển thị trên mỗi trang
+            total_pages = (len(panel) - 1) // rows_per_page + 1 # Tính tổng số trang
+            
+            # Khung chọn trang
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                page_num = st.number_input("Chọn trang:", min_value=1, max_value=total_pages, value=1, step=1)
+            
+            # Xác định vị trí cắt dữ liệu (slice)
+            start_idx = (page_num - 1) * rows_per_page
+            end_idx = start_idx + rows_per_page
+            paginated_df = panel.iloc[start_idx:end_idx]
+            
+            # Hiển thị dữ liệu (Chỉ đổi tên cột cho phần hiển thị)
+            st.dataframe(paginated_df.rename(columns=COL_NAMES_MAP), use_container_width=True)
+            
+            # Dòng chú thích bên dưới bảng
+            st.caption(f"Đang hiển thị từ dòng **{start_idx + 1}** đến **{min(end_idx, len(panel))}** trên tổng số **{len(panel)}** dòng.")
+            
+            st.markdown("---")
             st.markdown("### Tỷ lệ hộ có di cư lao động theo năm")
             df_migrant_rate = panel.groupby("year_std")["migrant"].mean().round(3).reset_index()
             st.dataframe(df_migrant_rate.rename(columns=COL_NAMES_MAP))
