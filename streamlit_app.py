@@ -221,7 +221,7 @@ if data_file_path is not None:
             ax_dag.axis("off")
             st.pyplot(fig_dag)
 
-        # --- TAB 4: MÔ HÌNH 1 (IPTW / PSM) ---
+# --- TAB 4: MÔ HÌNH 1 (IPTW / PSM) ---
         with tab4:
             st.subheader("Mô hình 1: Inverse Probability of Treatment Weighting (IPTW)")
             st.markdown("Kiểm soát thiên lệch chọn mẫu dựa trên các đặc điểm quan sát được (Selection on Observables).")
@@ -237,8 +237,15 @@ if data_file_path is not None:
             
             results_iptw = []
             for outcome in outcomes:
-                X_out = sm.add_constant(panel["migrant"])
-                wls_model = sm.WLS(panel[outcome], X_out, weights=weights).fit()
+                # LỌC BỎ CÁC GIÁ TRỊ NaN Ở BIẾN KẾT QUẢ ĐỂ TRÁNH LỖI "None"
+                valid_idx = panel[outcome].notna()
+                
+                y_valid = panel.loc[valid_idx, outcome]
+                X_valid = sm.add_constant(panel.loc[valid_idx, "migrant"])
+                w_valid = weights[valid_idx]
+                
+                # Chạy mô hình với tập dữ liệu đã lọc
+                wls_model = sm.WLS(y_valid, X_valid, weights=w_valid).fit()
                 
                 results_iptw.append({
                     "Biến Kết Quả": COL_NAMES_MAP.get(outcome, outcome),
@@ -260,8 +267,13 @@ if data_file_path is not None:
             
             results_fe = []
             for outcome in outcomes:
-                exog = sm.add_constant(panel_fe[covars_fe])
-                fe_model = PanelOLS(panel_fe[outcome], exog, entity_effects=True, drop_absorbed=True).fit()
+                # LỌC BỎ CÁC GIÁ TRỊ NaN TƯƠNG TỰ NHƯ MÔ HÌNH 1
+                valid_idx = panel_fe[outcome].notna()
+                
+                y_valid = panel_fe.loc[valid_idx, outcome]
+                exog_valid = sm.add_constant(panel_fe.loc[valid_idx, covars_fe])
+                
+                fe_model = PanelOLS(y_valid, exog_valid, entity_effects=True, drop_absorbed=True).fit()
                 
                 results_fe.append({
                     "Biến Kết Quả": COL_NAMES_MAP.get(outcome, outcome),
@@ -278,4 +290,4 @@ if data_file_path is not None:
         st.error(f"Đã xảy ra lỗi khi xử lý dữ liệu: {e}")
 
 else:
-    st.error("❌ Không tìm thấy file dữ liệu.\n\nVui lòng đặt file `Chapter_7a.dta` hoặc `varhs_combined_data.csv` vào cùng thư mục với file app.py.")
+    st.error("❌ Không tìm thấy file dữ liệu.\n")
