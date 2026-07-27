@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
 import os
+import glob
 
 # Cấu hình trang Streamlit
 st.set_page_config(page_title="Phân tích Di cư Lao động", layout="wide")
@@ -19,14 +20,33 @@ def std_year(y):
 def to_binary(s):
     return (s.astype(str).str.strip().str.lower() == "yes").astype(int)
 
+# --- HÀM TÌM KIẾM FILE TRONG THƯ MỤC ---
+def find_data_file(base_dir="."):
+    """
+    Tìm file dữ liệu theo thứ tự ưu tiên giống trong Notebook:
+    1. Chapter_7a.dta
+    2. varhs_combined_data.csv
+    """
+    # Tìm file dta có chứa '7a' trong tên
+    dta_files = glob.glob(os.path.join(base_dir, "**", "*7a*.dta"), recursive=True)
+    if dta_files:
+        return dta_files[0]
+    
+    # Tìm file CSV gộp nếu không có file dta
+    csv_files = glob.glob(os.path.join(base_dir, "**", "varhs_combined_data.csv"), recursive=True)
+    if csv_files:
+        return csv_files[0]
+        
+    return None
+
 # --- CACHE DỮ LIỆU ĐỂ TỐI ƯU HIỆU NĂNG ---
 @st.cache_data
-def load_and_clean_data(uploaded_file):
-    # Đọc dữ liệu
-    if uploaded_file.name.endswith('.dta'):
-        c7a = pd.read_stata(uploaded_file)
+def load_and_clean_data(file_path):
+    # Đọc dữ liệu từ đường dẫn
+    if file_path.endswith('.dta'):
+        c7a = pd.read_stata(file_path)
     else:
-        raw = pd.read_csv(uploaded_file, low_memory=False)
+        raw = pd.read_csv(file_path, low_memory=False)
         c7a = raw[raw["source_file"] == "Chapter_7a.dta"].copy()
 
     # Chuẩn hóa năm
@@ -57,21 +77,19 @@ def load_and_clean_data(uploaded_file):
     return panel
 
 # --- GIAO DIỆN CHÍNH ---
-st.title("Tác động của Di cư Lao động đến Chi tiêu & An sinh Hộ gia đình Nông thôn Việt Nam")
+st.title("Tác động của Di cư Lao động đến Chi tiêu & An sinh Hộ gia đình")
 st.markdown("""
 **Bộ dữ liệu:** Vietnam Access to Resources Household Survey (VARHS), UNU-WIDER  
 **Câu hỏi nghiên cứu:** Việc hộ gia đình có thành viên di cư lao động tác động như thế nào đến chi tiêu và an sinh tài chính của hộ?
 """)
 
-# --- SIDEBAR: TẢI DỮ LIỆU ---
-st.sidebar.header("Cấu hình Dữ liệu")
-uploaded_file = st.sidebar.file_uploader("Tải lên file Chapter_7a.dta hoặc varhs_combined_data.csv", type=["dta", "csv"])
+# Tự động tìm file
+data_file_path = find_data_file("./")
 
-if uploaded_file is not None:
+if data_file_path is not None:
     try:
         # Load dữ liệu
-        panel = load_and_clean_data(uploaded_file)
-        st.sidebar.success("✅ Đã tải và làm sạch dữ liệu thành công!")
+        panel = load_and_clean_data(data_file_path)
         
         # Tạo các tab để hiển thị nội dung
         tab1, tab2, tab3 = st.tabs(["📊 Dữ liệu Panel", "📈 Thống kê & Cân bằng", "🕸️ Khung nhân quả (DAG)"])
@@ -80,7 +98,7 @@ if uploaded_file is not None:
         with tab1:
             st.subheader("Bộ dữ liệu phân tích (Panel hộ gia đình 2012–2014)")
             st.markdown(f"**Số dòng sau làm sạch:** {panel.shape[0]} | **Số cột:** {panel.shape[1]}")
-            st.dataframe(panel.head(50)) # Hiển thị 50 dòng đầu cho nhẹ giao diện
+            st.dataframe(panel.head(50)) 
             
             st.markdown("### Tỷ lệ hộ có di cư lao động theo năm")
             st.dataframe(panel.groupby("year_std")["migrant"].mean().round(3).reset_index())
@@ -121,7 +139,7 @@ if uploaded_file is not None:
             axes[2].set_xticks(mig_rate.index)
 
             plt.tight_layout()
-            st.pyplot(fig) # Hiển thị biểu đồ lên Streamlit
+            st.pyplot(fig) 
 
         # --- TAB 3: ĐỒ THỊ DAG ---
         with tab3:
@@ -187,4 +205,4 @@ if uploaded_file is not None:
         st.error(f"Đã xảy ra lỗi khi xử lý dữ liệu: {e}")
 
 else:
-    st.info("Vui lòng tải lên bộ dữ liệu (file .dta hoặc .csv) ở thanh bên trái để bắt đầu phân tích.")
+    st.error("❌ Không tìm thấy file.\n\nVui lòng kiểm tra lại đường dẫn thư mục")
