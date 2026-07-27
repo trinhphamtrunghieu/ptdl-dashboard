@@ -198,7 +198,15 @@ if data_file_path is not None:
             # Tạo đồ thị bằng Graphviz
             graph = graphviz.Digraph()
             graph.attr(rankdir='LR', size='10,6') # Từ trái sang phải
-            
+            with graph.subgraph(name='cluster_legend') as c:
+                c.attr(label='Legend', color='black', style='solid', rank='sink')
+                
+                # Define legend items as key-value pairs of nodes
+                c.node('key1', 'Biến gây nhiễu (cofounder)', fillcolor='#a6cee3', style='filled')
+                c.node('key2', 'Biến can thiệp (treatment)', fillcolor='#fb9a99', style='filled')
+                c.node('key3', 'Biến trung gian (mediator)', fillcolor='#fdbf6f', style='filled')
+                c.node('key4', 'Biến kết quả (outcome)', fillcolor='#b2df8a', style='filled')
+            graph.render('graph_with_legend', format='png', cleanup=True)
             # Bảng màu
             color_treatment = "#fb9a99"
             color_mediator = "#fdbf6f"
